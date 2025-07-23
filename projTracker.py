@@ -2,6 +2,8 @@ import streamlit as st
 from openpyxl import load_workbook, Workbook
 import json
 import os
+from datetime import datetime
+from collections import defaultdict
 
 PROJECT_FILE = "projects.xlsx"
 USER_CREDENTIALS_FILE = "user_credentials.json"
@@ -132,7 +134,6 @@ if st.session_state.username:
         st.sidebar.markdown("---")
         st.sidebar.markdown("### 👥 Manage Members")
 
-        member_table = []
         for member in USER_CREDENTIALS.keys():
             if member != "admin":
                 assign = st.sidebar.checkbox(f"Assign {member} to project", key=f"assign_{member}")
@@ -163,11 +164,23 @@ if st.session_state.username:
 
         st.markdown("**Subtasks:**")
         if proj['Subtasks']:
-            for idx, task in enumerate(proj['Subtasks'], 1):
-                st.markdown(f"{idx}. **{task['Member']}**: {task['Description']} - {task['Progress']}% ({task['Status']})")
+            # Group by date and display
+            subtasks_by_date = defaultdict(list)
+            for task in proj['Subtasks']:
+                date = task.get("Timestamp", "").split(" ")[0] if "Timestamp" in task else "Unknown"
+                subtasks_by_date[date].append(task)
+
+            for date in sorted(subtasks_by_date.keys(), reverse=True):
+                st.markdown(f"---\n#### 🗓️ {date}")
+                for task in subtasks_by_date[date]:
+                    time = task.get("Timestamp", "").split(" ")[1] if "Timestamp" in task else "Unknown"
+                    st.markdown(
+                        f"- 🕒 `{time}` | 👤 **{task['Member']}** — _{task['Description']}_ (**{task['Progress']}%**, *{task['Status']}*)"
+                    )
         else:
             st.info("No subtasks yet.")
 
+        # Add Subtask
         if is_admin or st.session_state.username in (proj['TeamMembers'].split(', ') if proj['TeamMembers'] else []):
             subtask_desc = st.text_input(f"Task Description for {proj['Project']}", key=f"desc_{proj['Project']}")
             subtask_progress = st.slider(f"Progress for {proj['Project']} (%)", 0, 100, key=f"prog_{proj['Project']}")
@@ -175,14 +188,15 @@ if st.session_state.username:
 
             if st.button(f"Add Task to {proj['Project']}", key=f"addsub_{proj['Project']}"):
                 if subtask_desc:
-                    proj['Subtasks'].append({
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    proj['Subtasks'].insert(0, {
                         "Member": st.session_state.username,
                         "Description": subtask_desc,
                         "Progress": subtask_progress,
-                        "Status": subtask_status
+                        "Status": subtask_status,
+                        "Timestamp": timestamp
                     })
                     total = sum(s['Progress'] for s in proj['Subtasks'])
                     proj['Progress'] = round(total / len(proj['Subtasks']))
                     save_projects_to_excel(projects)
                     st.success("Task added!")
-                    # end of file 
