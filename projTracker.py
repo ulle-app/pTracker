@@ -162,6 +162,20 @@ if st.session_state.username:
         st.markdown(f"**Status:** {proj['Status']}")
         st.markdown(f"**Members:** {proj['TeamMembers'] or 'None'}")
 
+        # Member progress (admin only)
+        if is_admin:
+            st.markdown("**📈 Member-wise Progress:**")
+            member_tasks = defaultdict(list)
+            for task in proj['Subtasks']:
+                member_tasks[task['Member']].append(task['Progress'])
+
+            if member_tasks:
+                for member, progresses in member_tasks.items():
+                    avg_progress = round(sum(progresses) / len(progresses))
+                    st.markdown(f"- 👤 **{member}**: {avg_progress}% complete across {len(progresses)} task(s)")
+            else:
+                st.info("No member activity yet.")
+
         st.markdown("**Subtasks:**")
         if proj['Subtasks']:
             # Group by date and display
